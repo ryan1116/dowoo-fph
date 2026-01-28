@@ -1,0 +1,63 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Tier 2: 1-year historical market data (from CSV imports)
+model MarketData {
+  id          Int      @id @default(autoincrement())
+  date        DateTime
+  origin      String   // City/District (e.g., "Seoul/Gangnam")
+  destination String   // City/District (e.g., "Busan/Haeundae")
+  vehicleType String   // e.g., "11t", "5t", "25t"
+  freightType String   // e.g., "General", "Fragile", "Refrigerated"
+  unitPrice   Float    // KRW per route
+
+  createdAt DateTime @default(now())
+
+  @@index([origin, destination, vehicleType])
+  @@index([date])
+}
+
+// Cost variables and policies for Tier 1 calculation
+model CostMaster {
+  id          Int      @id @default(autoincrement())
+  category    String   // "Variable" | "Fixed" | "Policy" | "Risk"
+  item        String   // e.g., "fuel_price", "driver_profit_rate", "toll_rate"
+  vehicleType String?  // e.g., "11t" — null means global default
+  value       Float    // Numeric value
+  unit        String   // e.g., "KRW/L", "%", "KRW/km"
+  description String   // Human-readable description
+
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@unique([item, vehicleType])
+  @@index([category])
+}
+
+// Calculated FPH results per route
+model RouteStandard {
+  id                  Int      @id @default(autoincrement())
+  origin              String   // City/District
+  destination         String   // City/District
+  vehicleType         String   // e.g., "11t"
+  basePrice           Float    // Tier 1: Cost-based price
+  marketAdjustedPrice Float    // Tier 2: Market-adjusted price
+  finalPrice          Float    // Tier 3: Strategy-adjusted final price
+  confidenceScore     Float    // 0.0 ~ 1.0, data reliability indicator
+
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@unique([origin, destination, vehicleType])
+  @@index([origin, destination])
+}
